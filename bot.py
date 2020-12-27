@@ -7,6 +7,7 @@ from stopit import SignalTimeout as Timeout, signal_timeoutable as timeoutable
 client = discord.Client()
 globals()['inUse'] = False
 globals()['msg'] = None
+globals()['figure'] = None
 
 async def handle_content(message, situation):
     if message.content.startswith('$pyrun '):
@@ -18,14 +19,14 @@ async def handle_content(message, situation):
         for line in linesOld:
             if not '```' in line:
                 lines.append(line)
-            
+
         newCmd = ''.join(lines)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
         redirected_output = sys.stdout = StringIO()
         redirected_err = sys.stderr = StringIO()
         with Timeout(30.0, swallow_exc=False) as timeout_ctx:
-            exec(newCmd)
+            exec(newCmd, globals())
         sys.stdout = old_stdout
         sys.stderr = old_stderr
         if globals()['inUse'] and situation == "edit":
@@ -33,6 +34,8 @@ async def handle_content(message, situation):
         else:
             globals()['inUse'] = True
             globals()['msg'] = await message.channel.send('```'+redirected_output.getvalue()+redirected_err.getvalue()+'```')
+        if 'set_fig(' in newCmd:
+            await send_to_chat()
 
     elif message.content.startswith('$py'):
         cmd = message.content.split('$py ')
@@ -73,6 +76,12 @@ async def on_error(event, *args, **kwargs):
         globals()['msg'] = await message.channel.send(traceback.format_exc())
         
         
+def set_fig(filename):
+    globals()['figure'] = filename
+
+async def send_to_chat():
+    await globals()['msg'].channel.send(file=discord.File(globals()['figure']))
+
 if __name__ == "__main__":
     secret = ''
     with open('discordKey.txt', 'r') as f:
